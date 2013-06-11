@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+	<title>Puzzle</title>
+</head>
+<body>
+
+<canvas id="playfield" width="0" heigth="0"></canvas>
+<img id="image" src="puzzle.png">
+
+<script>
+   (function () {
+
+      var NUMBER_OF_COLUMNS = 5;
+      var NUMBER_OF_ROWS = 5;
+
+      var image = document.getElementById('image');
+      var cellImageWidth = -1;
+      var cellImageHeight = -1;
+
+      var playFieldCanvas = document.getElementById('playfield');
+      var playFieldContext = playFieldCanvas.getContext('2d');
+      var selectedCellIndex = undefined;
+      var cells = [];
+
+      function cellIndex(x, y) {
+         return y * NUMBER_OF_COLUMNS + x;
+      }
+
+      function allCells(func) {
+         for (var y = 0; y < NUMBER_OF_ROWS; ++y) {
+            for (var x = 0; x < NUMBER_OF_COLUMNS; ++x) {
+               func(x, y);
+            }
+         }
+      }
+
+      function drawCell(x, y) {
+         var positionOfImage = cells[cellIndex(x, y)];
+         var imageOffsetX = positionOfImage.x * cellImageWidth;
+         var imageOffsetY = positionOfImage.y * cellImageHeight;
+
+         playFieldContext.drawImage( image, imageOffsetX, imageOffsetY,
+                                     cellImageWidth, cellImageHeight,
+                                     x * cellImageWidth, y * cellImageHeight,
+                                     cellImageWidth, cellImageHeight );
+        /*
+         playFieldContext.beginPath();
+         playFieldContext.rect(x * 50, y * 50, 50, 50);
+         playFieldContext.fillText(cells[cellIndex(x, y)].y*NUMBER_OF_COLUMNS+x, x * 50 + 20, y * 50 + 30);
+         playFieldContext.lineWidth = 1;
+         playFieldContext.strokeStyle = 'black';
+         playFieldContext.stroke();
+         */
+      }
+
+      function drawPlayfield() {
+         playFieldContext.clearRect(0, 0, playFieldCanvas.width, playFieldCanvas.height);
+         allCells(function toDraw(x, y) {
+            drawCell(x, y);
+         });
+      }
+
+      function moveCell(fromCell, toCell) {
+         var toCellValue = cells[toCell];
+         cells[toCell] = cells[fromCell];
+         cells[fromCell] = toCellValue;
+      }
+
+      function handleClickEvent(event) {
+         var clickedCellX = Math.floor(event.offsetX / cellImageWidth);
+         var clickedCellY = Math.floor(event.offsetY / cellImageHeight);
+         var clickedCellIndex = cellIndex(clickedCellX, clickedCellY);
+         if (selectedCellIndex && selectedCellIndex != clickedCellIndex) {
+            moveCell(selectedCellIndex, clickedCellIndex);
+            drawPlayfield();
+            selectedCellIndex = undefined;
+         } else {
+            selectedCellIndex = clickedCellIndex;
+         }
+      }
+
+      function initialise() {
+         allCells(function toInitialise(x, y) {
+            var index = cellIndex(x, y);
+            cells[index] = { x: x, y: y };
+         });
+         playFieldCanvas.addEventListener('click', handleClickEvent);
+      }
+
+      image.onload = function() {
+         playFieldCanvas.width = this.width;
+         playFieldCanvas.height = this.width;
+
+         cellImageWidth = Math.floor( this.width / NUMBER_OF_COLUMNS );
+         cellImageHeight = Math.floor( this.height / NUMBER_OF_ROWS );
+
+         initialise();
+         drawPlayfield();
+      }
+
+
+   }());
+</script>
+
+</body>
+</html>
