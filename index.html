@@ -1,17 +1,51 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+   <meta charset="utf-8" />
+   <meta name="viewport" content="width=device-width" />
+   <meta name="apple-mobile-web-app-capable" content="yes" />
+   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+   <link rel="apple-touch-icon" href="Puzzle57x57.png">
+   <link rel="apple-touch-icon" sizes="114x114" href="Puzzle114x114.png">
+   <link rel="apple-touch-startup-image" href="Puzzle.png" />
+
+   <style type="text/css">
+      #splashScreen {
+         position: absolute;
+         top:  000px;
+         width: 400px;
+         display: block;
+         margin-left: auto;
+         margin-right: auto;
+      }
+
+      #application {
+         display: none; //at first not visible
+      }
+
+   </style>
+
+
 	<title>Puzzle</title>
 </head>
 <body>
 
+<div id="splashScreen">
+
+   <img id="splashScreenImage"  src="splashScreen.png">
+</div>
+
+<div id="application">
 <canvas id="playfield" width="0" heigth="0"></canvas>
 <img id="image" src="puzzle.png">
+</div>
 
 <script>
    (function () {
 
+      // ---------------------------------------------------------------------------------------------------------------
       // class Cells ---------------------------------------------------------------------------------------------------
+      // ---------------------------------------------------------------------------------------------------------------
 
       function Cells( rows, columns ) {
          this.rows = rows,
@@ -26,6 +60,13 @@
          }
       }
 
+      Cells.prototype.cellXY = function cellXY( cellIndex ) {
+         return {
+            y: Math.floor( cellIndex / this.rows ),
+            x: cellIndex % this.rows
+         };
+      };
+
       Cells.prototype.cellIndex = function cellIndex(x, y) {
             return y * this.rows + x;
       };
@@ -38,8 +79,11 @@
          }
       };
 
-      Cells.prototype.cell = function cell( x, y ) {
-         return this.cells[ this.cellIndex(x, y) ];
+      Cells.prototype.cell = function cell( xOrCellIndex, y ) {
+         if( !y ) {
+            return this.cells[ xOrCellIndex ];
+         }
+         return this.cells[ this.cellIndex( xOrCellIndex, y ) ];
       }
 
       Cells.prototype.exchange = function exchange(fromCell, toCell) {
@@ -50,26 +94,49 @@
 
       // ---------------------------------------------------------------------------------------------------------------
 
-      var NUMBER_OF_COLUMNS = 5;
-      var NUMBER_OF_ROWS = 5;
+      // ---------------------------------------------------------------------------------------------------------------
+      // Functions------------------------------------------------------------------------------------------------------
+      // ---------------------------------------------------------------------------------------------------------------
 
-      var image = document.getElementById('image');
-      var cellImageWidth = -1;
-      var cellImageHeight = -1;
+      function $( id ) {
+         return document.getElementById( id );
+      }
 
-      var playFieldCanvas = document.getElementById('playfield');
-      var playFieldContext = playFieldCanvas.getContext('2d');
-      var selectedCellIndex = undefined;
-      var cells = undefined;
+      function isMobile() {
+         return window.Touch;
+      }
 
-      function drawCell(x, y, cell) {
+      function showApplication() {
+         $( 'splashScreen' ).style.display = 'none';
+         $( 'application' ).style.display = 'block';
+      }
+
+      function drawCell( xOrCellIndex, yOrWithBorder, cell ) {
+         var withBorder = false;
+
+         if( typeof yOrWithBorder === 'boolean' && cell === undefined ) {
+            var cellXY = cells.cellXY( xOrCellIndex );
+            withBorder = yOrWithBorder;
+            cell = cells.cell( xOrCellIndex );
+            xOrCellIndex = cellXY.x;
+            yOrWithBorder = cellXY.y;
+         }
          var imageOffsetX = cell.x * cellImageWidth;
          var imageOffsetY = cell.y * cellImageHeight;
 
          playFieldContext.drawImage( image, imageOffsetX, imageOffsetY,
                                      cellImageWidth, cellImageHeight,
-                                     x * cellImageWidth, y * cellImageHeight,
+                                     xOrCellIndex * cellImageWidth, yOrWithBorder * cellImageHeight,
                                      cellImageWidth, cellImageHeight );
+         if( withBorder ) {
+            playFieldContext.beginPath();
+            playFieldContext.rect( xOrCellIndex * cellImageWidth + 1, yOrWithBorder * cellImageHeight + 1,
+                                   cellImageWidth - 2, cellImageHeight - 2 );
+            playFieldContext.lineWidth = 1;
+            playFieldContext.strokeStyle = 'red';
+            playFieldContext.stroke();
+         }
+
         /*
          playFieldContext.beginPath();
          playFieldContext.rect(x * 50, y * 50, 50, 50);
@@ -87,23 +154,60 @@
          });
       }
 
-      function handleClickEvent(event) {
-         var clickedCellX = Math.floor( event.offsetX / cellImageWidth );
-         var clickedCellY = Math.floor( event.offsetY / cellImageHeight );
+      function handleSelectionEvent( x, y ) {
+         var clickedCellX = Math.floor( x / cellImageWidth );
+         var clickedCellY = Math.floor( y / cellImageHeight );
          var clickedCellIndex = cells.cellIndex( clickedCellX, clickedCellY );
-
          if( selectedCellIndex && selectedCellIndex != clickedCellIndex ) {
             cells.exchange( selectedCellIndex, clickedCellIndex );
-            drawPlayfield();
+            drawCell( selectedCellIndex, false );
+            drawCell( clickedCellIndex, false );
             selectedCellIndex = undefined;
          } else {
             selectedCellIndex = clickedCellIndex;
+            drawCell( clickedCellIndex, true );
          }
+      }
+
+      function handleClickEvent(event) {
+         handleSelectionEvent( event.offsetX, event.offsetY );
+      }
+
+      function handleTouchEvent( event ) {
+         var touch = event.changedTouches[ 0 ];
+         handleSelectionEvent( touch.clientX, touch.clientY );
       }
 
       function initialise() {
          cells = new Cells(NUMBER_OF_ROWS, NUMBER_OF_COLUMNS);
-         playFieldCanvas.addEventListener('click', handleClickEvent);
+         if( isMobile() ) {
+            playFieldCanvas.addEventListener( 'touchstart', handleTouchEvent );
+         } else {
+            playFieldCanvas.addEventListener( 'click', handleClickEvent );
+         }
+      }
+
+      // --------------------------------------------------------------------------------------------------------
+      // main ---------------------------------------------------------------------------------------------------
+      // --------------------------------------------------------------------------------------------------------
+
+      var NUMBER_OF_COLUMNS = 5;
+      var NUMBER_OF_ROWS = 5;
+
+      var image = document.getElementById('image');
+      var cellImageWidth = -1;
+      var cellImageHeight = -1;
+
+      var playFieldCanvas = document.getElementById('playfield');
+      var playFieldContext = playFieldCanvas.getContext('2d');
+      var selectedCellIndex = undefined;
+      var cells = undefined;
+
+      $( 'splashScreenImage' ).onload = function() {
+         var top4Image = ( window.innerHeight - splashScreenImage.clientHeight ) / 2;
+         splashScreen.style.top = top4Image + 'px';
+
+         window.onload=window.setTimeout( showApplication,2000);
       }
 
       image.onload = function() {
@@ -117,8 +221,7 @@
          drawPlayfield();
       }
 
-
-   }());
+}());
 </script>
 
 </body>
