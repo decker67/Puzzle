@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
    <meta charset="utf-8" />
-   <meta name="viewport" content="width=device-width" />
+   <meta name="viewport" content="user-scalable=no, width=device-width, height=device-height" />
    <meta name="apple-mobile-web-app-capable" content="yes" />
    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
    <link rel="apple-touch-icon" href="Puzzle57x57.png">
@@ -10,10 +10,15 @@
    <link rel="apple-touch-startup-image" href="Puzzle.png" />
 
    <style type="text/css">
+      * {
+         padding:0;
+         margin:0;
+      }
+
       #splashScreen {
          position: absolute;
-         top:  0px; //will be calculated during start
-         width: 400px;
+         top: 0px; //will be calculated during start
+      left: 0px;
          display: block;
          margin-left: auto;
          margin-right: auto;
@@ -23,203 +28,258 @@
          display: none; //at first not visible
       }
 
+      #selectImage {
+         display: none; //should not be visible
+      }
+
    </style>
 
 
-	<title>Puzzle</title>
+   <title>Puzzle</title>
 </head>
 <body>
 
 <div id="splashScreen">
-
    <img id="splashScreenImage"  src="splashScreen.png">
+   <input id="selectImage" type="file" accept="image/*" capture >
 </div>
 
 <div id="application">
-<canvas id="playfield" width="0" heigth="0"></canvas>
-<img id="image" src="puzzle.png">
+   <canvas id="playfield" width="0" heigth="0"></canvas>
+   <img id="image"  src="puzzle.png">
 </div>
 
 <script>
-   (function () {
+(function () {
 
-      // ---------------------------------------------------------------------------------------------------------------
-      // class Cells ---------------------------------------------------------------------------------------------------
-      // ---------------------------------------------------------------------------------------------------------------
+   // ---------------------------------------------------------------------------------------------------------------
+   // class Cells ---------------------------------------------------------------------------------------------------
+   // ---------------------------------------------------------------------------------------------------------------
 
-      function Cells( rows, columns ) {
-         this.rows = rows,
+   function Cells( rows, columns ) {
+      this.rows = rows,
          this.columns = columns,
          this.cells = new Array( this.rows * this.columns );
-         var i, j, k = 0;
-         for( i = 0; i < this.rows; ++i ) {
-            for( j = 0; j < this.columns; ++j ) {
-               this.cells[ k ] = { x: j, y: i };
-               ++k;
-            }
+      var i, j, k = 0;
+      for( i = 0; i < this.rows; ++i ) {
+         for( j = 0; j < this.columns; ++j ) {
+            this.cells[ k ] = { x: j, y: i };
+            ++k;
          }
       }
+   }
 
-      Cells.prototype.cellXY = function cellXY( cellIndex ) {
-         return {
-            y: Math.floor( cellIndex / this.rows ),
-            x: cellIndex % this.rows
-         };
+   Cells.prototype.cellCoordinates = function cellCoordinates( cellIndex ) {
+      return {
+         y: Math.floor( cellIndex / this.rows ),
+         x: cellIndex % this.rows
       };
+   };
 
-      Cells.prototype.cellIndex = function cellIndex(x, y) {
-            return y * this.rows + x;
-      };
+   Cells.prototype.cellIndex = function cellIndex(x, y) {
+      return y * this.rows + x;
+   };
 
-      Cells.prototype.each = function each( callbackFunction ) {
-         for (var y = 0; y < this.rows; ++y) {
-            for (var x = 0; x < this.columns; ++x) {
-               callbackFunction(x, y, this.cell(x, y) );
-            }
+   Cells.prototype.eachCell = function eachCell( callbackFunction ) {
+      for (var y = 0; y < this.rows; ++y) {
+         for (var x = 0; x < this.columns; ++x) {
+            callbackFunction(x, y, this.cell(x, y) );
          }
-      };
-
-      Cells.prototype.cell = function cell( xOrCellIndex, y ) {
-         if( !y ) {
-            return this.cells[ xOrCellIndex ];
-         }
-         return this.cells[ this.cellIndex( xOrCellIndex, y ) ];
       }
+   };
 
-      Cells.prototype.exchange = function exchange(fromCell, toCell) {
-         var toCellValue = this.cells[toCell];
-         this.cells[toCell] = this.cells[fromCell];
-         this.cells[fromCell] = toCellValue;
+   Cells.prototype.cell = function cell( x, y ) {
+      if( y ) {
+         return this.cells[ this.cellIndex( x, y ) ];
       }
+      return this.cells[ x ];
+   }
 
-      // ---------------------------------------------------------------------------------------------------------------
-
-      // ---------------------------------------------------------------------------------------------------------------
-      // Functions------------------------------------------------------------------------------------------------------
-      // ---------------------------------------------------------------------------------------------------------------
-
-      function $( id ) {
-         return document.getElementById( id );
+   Cells.prototype.exchangeCells = function exchangeCells(fromCell, toCell) {
+      if( fromCell === toCell ) {
+         return;
       }
+      var toCellValue = this.cells[toCell];
+      this.cells[toCell] = this.cells[fromCell];
+      this.cells[fromCell] = toCellValue;
+   }
 
-      function isMobile() {
-         return window.Touch;
+   Cells.prototype.scrambleCells = function scrambleCells() {
+      var that = this;
+      this.eachCell( function scramble( x, y, cell ) {
+         var toX = Math.floor( Math.random() * that.columns );
+         var toY = Math.floor( Math.random() * that.rows );
+         that.exchangeCells( that.cellIndex( x, y ), that.cellIndex( toX, toY ) );
+      } );
+   }
+
+   // ---------------------------------------------------------------------------------------------------------------
+
+   // ---------------------------------------------------------------------------------------------------------------
+   // Functions------------------------------------------------------------------------------------------------------
+   // ---------------------------------------------------------------------------------------------------------------
+
+   function $( id ) {
+      return document.getElementById( id );
+   }
+
+   function isMobile() {
+      return window.Touch;
+   }
+
+   function showApplication() {
+      $( 'splashScreen' ).style.display = 'none';
+      $( 'application' ).style.display = 'block';
+   }
+
+   function drawCell( xOrCellIndex, yOrWithBorder, cell ) {
+      var withBorder = false;
+
+      if( typeof yOrWithBorder === 'boolean' && cell === undefined ) {
+         var cellXY = cells.cellCoordinates( xOrCellIndex );
+         withBorder = yOrWithBorder;
+         cell = cells.cell( xOrCellIndex );
+         xOrCellIndex = cellXY.x;
+         yOrWithBorder = cellXY.y;
       }
+      var imageOffsetX = cell.x * cellImageWidth;
+      var imageOffsetY = cell.y * cellImageHeight;
 
-      function showApplication() {
-         $( 'splashScreen' ).style.display = 'none';
-         $( 'application' ).style.display = 'block';
-      }
-
-      function drawCell( xOrCellIndex, yOrWithBorder, cell ) {
-         var withBorder = false;
-
-         if( typeof yOrWithBorder === 'boolean' && cell === undefined ) {
-            var cellXY = cells.cellXY( xOrCellIndex );
-            withBorder = yOrWithBorder;
-            cell = cells.cell( xOrCellIndex );
-            xOrCellIndex = cellXY.x;
-            yOrWithBorder = cellXY.y;
-         }
-         var imageOffsetX = cell.x * cellImageWidth;
-         var imageOffsetY = cell.y * cellImageHeight;
-
-         playFieldContext.drawImage( image, imageOffsetX, imageOffsetY,
-                                     cellImageWidth, cellImageHeight,
-                                     xOrCellIndex * cellImageWidth, yOrWithBorder * cellImageHeight,
-                                     cellImageWidth, cellImageHeight );
-         if( withBorder ) {
-            playFieldContext.beginPath();
-            playFieldContext.rect( xOrCellIndex * cellImageWidth + 1, yOrWithBorder * cellImageHeight + 1,
-                                   cellImageWidth - 2, cellImageHeight - 2 );
-            playFieldContext.lineWidth = 1;
-            playFieldContext.strokeStyle = 'red';
-            playFieldContext.stroke();
-         }
-
-        /*
+      playFieldContext.drawImage( image, imageOffsetX, imageOffsetY,
+         cellImageWidth, cellImageHeight,
+         xOrCellIndex * cellImageWidth, yOrWithBorder * cellImageHeight,
+         cellImageWidth, cellImageHeight );
+      if( withBorder ) {
          playFieldContext.beginPath();
-         playFieldContext.rect(x * 50, y * 50, 50, 50);
-         playFieldContext.fillText(cells[cellIndex(x, y)].y*NUMBER_OF_COLUMNS+x, x * 50 + 20, y * 50 + 30);
+         playFieldContext.rect( xOrCellIndex * cellImageWidth + 1, yOrWithBorder * cellImageHeight + 1,
+            cellImageWidth - 2, cellImageHeight - 2 );
          playFieldContext.lineWidth = 1;
-         playFieldContext.strokeStyle = 'black';
+         playFieldContext.strokeStyle = 'red';
          playFieldContext.stroke();
-         */
       }
 
-      function drawPlayfield() {
-         playFieldContext.clearRect(0, 0, playFieldCanvas.width, playFieldCanvas.height);
-         cells.each( function toDraw( x, y, cell ) {
-            drawCell( x, y, cell );
-         });
-      }
+      /*
+       playFieldContext.beginPath();
+       playFieldContext.rect(x * 50, y * 50, 50, 50);
+       playFieldContext.fillText(cells[cellIndex(x, y)].y*NUMBER_OF_COLUMNS+x, x * 50 + 20, y * 50 + 30);
+       playFieldContext.lineWidth = 1;
+       playFieldContext.strokeStyle = 'black';
+       playFieldContext.stroke();
+       */
+   }
 
-      function handleSelectionEvent( x, y ) {
-         var clickedCellX = Math.floor( x / cellImageWidth );
-         var clickedCellY = Math.floor( y / cellImageHeight );
-         var clickedCellIndex = cells.cellIndex( clickedCellX, clickedCellY );
-         if( selectedCellIndex && selectedCellIndex != clickedCellIndex ) {
-            cells.exchange( selectedCellIndex, clickedCellIndex );
-            drawCell( selectedCellIndex, false );
-            drawCell( clickedCellIndex, false );
-            selectedCellIndex = undefined;
-         } else {
-            selectedCellIndex = clickedCellIndex;
-            drawCell( clickedCellIndex, true );
-         }
-      }
+   function drawPlayfield() {
+      playFieldContext.clearRect(0, 0, playFieldCanvas.width, playFieldCanvas.height);
+      cells.eachCell( function toDraw( x, y, cell ) {
+         drawCell( x, y, cell );
+      });
+   }
 
-      function handleClickEvent(event) {
-         handleSelectionEvent( event.offsetX, event.offsetY );
+   function handleSelectionEvent( x, y ) {
+      var clickedCellX = Math.floor( x / cellImageWidth );
+      var clickedCellY = Math.floor( y / cellImageHeight );
+      var clickedCellIndex = cells.cellIndex( clickedCellX, clickedCellY );
+      if( selectedCellIndex && selectedCellIndex != clickedCellIndex ) {
+         cells.exchangeCells( selectedCellIndex, clickedCellIndex );
+         drawCell( selectedCellIndex, false );
+         drawCell( clickedCellIndex, false );
+         selectedCellIndex = undefined;
+      } else if( selectedCellIndex ) {
+         drawCell( selectedCellIndex, false );
+         selectedCellIndex = undefined;
       }
+      else {
+         selectedCellIndex = clickedCellIndex;
+         drawCell( clickedCellIndex, true );
+      }
+   }
 
-      function handleTouchEvent( event ) {
+   function handleClickEvent(event) {
+      handleSelectionEvent( event.offsetX, event.offsetY );
+   }
+
+   function handleTouchEvent( event ) {
+      if( event.changedTouches.length === 1 ) {
          var touch = event.changedTouches[ 0 ];
          handleSelectionEvent( touch.clientX, touch.clientY );
       }
+   }
 
-      function initialise() {
-         cells = new Cells(NUMBER_OF_ROWS, NUMBER_OF_COLUMNS);
-         if( isMobile() ) {
-            playFieldCanvas.addEventListener( 'touchstart', handleTouchEvent );
-         } else {
-            playFieldCanvas.addEventListener( 'click', handleClickEvent );
-         }
+   function setEventHandlers() {
+      if (isMobile()) {
+         playFieldCanvas.addEventListener('touchstart', handleTouchEvent);
+      } else {
+         playFieldCanvas.addEventListener('click', handleClickEvent);
       }
+   }
 
-      // --------------------------------------------------------------------------------------------------------
-      // main ---------------------------------------------------------------------------------------------------
-      // --------------------------------------------------------------------------------------------------------
+   function initialise() {
+      cells = new Cells(NUMBER_OF_ROWS, NUMBER_OF_COLUMNS);
+      cells.scrambleCells();
+      setEventHandlers();
+   }
 
-      var NUMBER_OF_COLUMNS = 5;
-      var NUMBER_OF_ROWS = 5;
+   // --------------------------------------------------------------------------------------------------------
+   // main ---------------------------------------------------------------------------------------------------
+   // --------------------------------------------------------------------------------------------------------
 
-      var image = document.getElementById('image');
-      var cellImageWidth = -1;
-      var cellImageHeight = -1;
+   var NUMBER_OF_COLUMNS = 5;
+   var NUMBER_OF_ROWS = 5;
 
-      var playFieldCanvas = document.getElementById('playfield');
-      var playFieldContext = playFieldCanvas.getContext('2d');
-      var selectedCellIndex = undefined;
-      var cells = undefined;
+   var image = $( 'image' );
+   var cellImageWidth = -1;
+   var cellImageHeight = -1;
 
-      $( 'splashScreenImage' ).onload = function() {
-         var top4Image = ( window.innerHeight - splashScreenImage.clientHeight ) / 2;
-         splashScreen.style.top = top4Image + 'px';
+   var playFieldCanvas = document.getElementById('playfield');
+   var playFieldContext = playFieldCanvas.getContext('2d');
+   var selectedCellIndex = undefined;
+   var cells = undefined;
 
-         window.onload=window.setTimeout( showApplication,2000);
-      }
+   $( 'splashScreenImage' ).onload = function() {
+      var top4Image = ( window.innerHeight - splashScreenImage.clientHeight ) / 2;
+      var left4Image = ( window.innerWidth - splashScreenImage.clientWidth ) / 2;
+      splashScreen.style.top = top4Image + 'px';
+      splashScreen.style.left = left4Image + 'px';
 
-      image.onload = function() {
-         playFieldCanvas.width = this.width;
-         playFieldCanvas.height = this.width;
+      splashScreenImage.addEventListener( 'click', selectImage );
+      window.onload=window.setTimeout( showApplication,2000);
+   }
 
-         cellImageWidth = Math.floor( this.width / NUMBER_OF_COLUMNS );
-         cellImageHeight = Math.floor( this.height / NUMBER_OF_ROWS );
 
-         initialise();
-         drawPlayfield();
-      }
+   function selectImage() {
+      var selectImage = $( 'selectImage');
+      selectImage.click();
+      selectImage.addEventListener( 'change', function loadImage() {
+         var file = selectImage.files[0];
+         if (file) {
+            var reader = new FileReader();
+            image.file = file;
+            reader.onload = (function( image) {
+               return function( event ) {
+                  image.src = event.target.result;
+               }
+            })( image );
+            reader.readAsDataURL(file);
+        }
+      } );
+   }
+
+   image.onload = function() {
+      playFieldCanvas.width = this.width;
+      playFieldCanvas.height = this.height;
+
+      cellImageWidth = Math.floor( this.width / NUMBER_OF_COLUMNS );
+      cellImageHeight = Math.floor( this.height / NUMBER_OF_ROWS );
+
+      var image = $( 'image' );
+      image.width = this.width;
+      image.height = this.height;
+
+      initialise();
+      drawPlayfield();
+   }
+
+
 
 }());
 </script>
