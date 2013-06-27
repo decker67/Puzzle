@@ -58,8 +58,8 @@
 
    function Cells( rows, columns ) {
       this.rows = rows,
-         this.columns = columns,
-         this.cells = new Array( this.rows * this.columns );
+      this.columns = columns,
+      this.cells = new Array( this.rows * this.columns );
       var i, j, k = 0;
       for( i = 0; i < this.rows; ++i ) {
          for( j = 0; j < this.columns; ++j ) {
@@ -179,12 +179,12 @@
       var clickedCellX = Math.floor( x / cellImageWidth );
       var clickedCellY = Math.floor( y / cellImageHeight );
       var clickedCellIndex = cells.cellIndex( clickedCellX, clickedCellY );
-      if( selectedCellIndex && selectedCellIndex != clickedCellIndex ) {
+      if( selectedCellIndex !== undefined && selectedCellIndex !== clickedCellIndex ) {
          cells.exchangeCells( selectedCellIndex, clickedCellIndex );
          drawCell( selectedCellIndex, false );
          drawCell( clickedCellIndex, false );
          selectedCellIndex = undefined;
-      } else if( selectedCellIndex ) {
+      } else if( selectedCellIndex !== undefined ) {
          drawCell( selectedCellIndex, false );
          selectedCellIndex = undefined;
       }
@@ -206,7 +206,7 @@
    }
 
    function setEventHandlers() {
-      if (isMobile()) {
+      if ( isMobile() ) {
          playFieldCanvas.addEventListener('touchstart', handleTouchEvent);
       } else {
          playFieldCanvas.addEventListener('click', handleClickEvent);
@@ -235,6 +235,8 @@
    var selectedCellIndex = undefined;
    var cells = undefined;
 
+   var splashScreenTimeout = undefined;
+
    $( 'splashScreenImage' ).onload = function() {
       var top4Image = ( window.innerHeight - splashScreenImage.clientHeight ) / 2;
       var left4Image = ( window.innerWidth - splashScreenImage.clientWidth ) / 2;
@@ -242,25 +244,30 @@
       splashScreen.style.left = left4Image + 'px';
 
       splashScreenImage.addEventListener( 'click', selectImage );
-      window.onload=window.setTimeout( showApplication,2000);
+      splashScreenTimeout = window.setTimeout( showApplication,2000);
    }
 
 
    function selectImage() {
+      window.clearTimeout( splashScreenTimeout );
       var selectImage = $( 'selectImage');
       selectImage.click();
       selectImage.addEventListener( 'change', function loadImage() {
          var file = selectImage.files[0];
-         if (file) {
-            var reader = new FileReader();
-            image.file = file;
-            reader.onload = (function( image) {
-               return function( event ) {
-                  image.src = event.target.result;
-               }
-            })( image );
-            reader.readAsDataURL(file);
-        }
+         var reader = new FileReader();
+         var image = new Image();
+         reader.onload = function( loadEvent ) {
+            image.src = loadEvent.target.result;
+         };
+         image.onload = function() {
+            $( 'image').width = this.width;
+            $( 'image').height = this.height;
+            $( 'image').src = image.src;
+
+            showApplication();
+         };
+         reader.readAsDataURL( file );
+
       } );
    }
 
